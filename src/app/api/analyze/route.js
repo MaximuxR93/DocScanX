@@ -1,29 +1,30 @@
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
+import * as pdfParse from "pdf-parse";
 
 export async function POST(req) {
+  try {
+    const data = await req.formData();
+    const file = data.get("resume");
 
-  const data = await req.formData();
-  const file = data.get("resume");
+    if (!file) {
+      return Response.json({ error: "No file uploaded" });
+    }
 
-  const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+    // dynamic import (fixes turbopack esm issue)
+    const pdfParse = (await import("pdf-parse")).default;
 
-  let text = "";
+    const pdfData = await pdfParse(buffer);
 
-  for (let i = 1; i <= pdf.numPages; i++) {
+    return Response.json({
+      resumeText: pdfData.text
+    });
 
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
+  } catch (error) {
+    console.error("PDF ERROR:", error);
 
-    const pageText = content.items.map(item => item.str).join(" ");
-
-    text += pageText + " ";
-
+    return Response.json({
+      error: "PDF parsing failed"
+    });
   }
-
-  return Response.json({
-    resumeText: text
-  });
-
 }

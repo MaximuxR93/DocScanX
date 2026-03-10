@@ -9,7 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.96",
     "next": "16.1.6",
+    "pdf-text-extract": "^1.5.0",
+    "pdfjs-dist": "^3.11.174",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

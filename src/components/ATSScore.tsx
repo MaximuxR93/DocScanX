@@ -9,28 +9,36 @@ interface ATSScoreProps {
 
 export default function ATSScore({ score, label = "ATS Match" }: ATSScoreProps) {
 
+  // Prevent NaN or invalid values
+  const safeScore =
+    typeof score === "number" && !isNaN(score) ? score : 0;
+
   const [animated, setAnimated] = useState<number>(0);
 
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
 
-  const offset = circumference - (animated / 100) * circumference;
+  const offset =
+    circumference - (animated / 100) * circumference;
 
   useEffect(() => {
-    const timeout = setTimeout(() => setAnimated(score), 100);
+    const timeout = setTimeout(() => {
+      setAnimated(safeScore);
+    }, 100);
+
     return () => clearTimeout(timeout);
-  }, [score]);
+  }, [safeScore]);
 
   const getScoreColor = () => {
-    if (score >= 75) return "#22c55e";
-    if (score >= 50) return "#facc15";
+    if (safeScore >= 75) return "#22c55e";
+    if (safeScore >= 50) return "#facc15";
     return "#ef4444";
   };
 
   const getScoreLabel = () => {
-    if (score >= 75) return "Excellent";
-    if (score >= 50) return "Good";
-    if (score >= 25) return "Needs Work";
+    if (safeScore >= 75) return "Excellent";
+    if (safeScore >= 50) return "Good";
+    if (safeScore >= 25) return "Needs Work";
     return "Poor";
   };
 
@@ -39,7 +47,12 @@ export default function ATSScore({ score, label = "ATS Match" }: ATSScoreProps) 
 
       <div className="relative w-32 h-32">
 
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+        <svg
+          className="w-full h-full -rotate-90"
+          viewBox="0 0 120 120"
+        >
+
+          {/* Background circle */}
 
           <circle
             cx="60"
@@ -49,6 +62,8 @@ export default function ATSScore({ score, label = "ATS Match" }: ATSScoreProps) 
             stroke="#2a2a2a"
             strokeWidth="8"
           />
+
+          {/* Progress circle */}
 
           <circle
             cx="60"
@@ -79,7 +94,10 @@ export default function ATSScore({ score, label = "ATS Match" }: ATSScoreProps) 
         {label}
       </span>
 
-      <span className="text-sm font-semibold" style={{ color: getScoreColor() }}>
+      <span
+        className="text-sm font-semibold"
+        style={{ color: getScoreColor() }}
+      >
         {getScoreLabel()}
       </span>
 

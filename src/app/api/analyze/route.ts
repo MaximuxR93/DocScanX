@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     const data = await req.formData();
 
     const file = data.get("resume") as File;
-    const jobDescription = data.get("jobDescription") as string;
+    const jobDescription = (data.get("jobDescription") as string) || "";
 
     if (!file) {
       return NextResponse.json(
@@ -46,6 +46,8 @@ export async function POST(req: Request) {
     tempPath = path.join(os.tmpdir(), `resume-${Date.now()}.pdf`);
 
     fs.writeFileSync(tempPath, buffer);
+
+    // Extract text from PDF
 
     const rawText = await new Promise<string>((resolve, reject) => {
 
@@ -68,6 +70,8 @@ export async function POST(req: Request) {
       );
     }
 
+    // Ask Groq AI
+
     const completion = await groq.chat.completions.create({
 
       model: "llama-3.3-70b-versatile",
@@ -78,15 +82,16 @@ export async function POST(req: Request) {
           content: `
 You are an ATS system.
 
+Return ONLY valid JSON in this format:
+
+{
+  "score": number,
+  "matchedSkills": ["skill"],
+  "missingSkills": ["skill"],
+  "suggestions": ["suggestion"]
+}
+
 Compare the resume with the job description.
-
-Return:
-
-ATS Match Score (0-100)
-
-Matched Skills
-Missing Keywords
-Suggestions to improve the resume
 
 Resume:
 ${text}
@@ -99,13 +104,40 @@ ${jobDescription}
 
     });
 
-    const analysis =
-      completion?.choices?.[0]?.message?.content ??
-      "No response from AI.";
+    const rawAI =
+      completion?.choices?.[0]?.message?.content || "{}";
+
+    let parsed;
+
+    try {
+      parsed = JSON.parse(rawAI);
+    } catch {
+      parsed = {
+        score: 0,
+        matchedSkills: [],
+        missingSkills: [],
+        suggestions: []
+      };
+    }
+
+    // Keyword scanning
+
+    const keywords =
+      jobDescription.toLowerCase().match(/\b[a-zA-Z+#.]+\b/g) || [];
+
+    const uniqueKeywords = [...new Set(keywords)];
+
+    const keywordScan = uniqueKeywords.slice(0, 40).map((keyword) => ({
+      keyword,
+      found: text.toLowerCase().includes(keyword)
+    }));
 
     return NextResponse.json({
-      resumeText: text,
-      analysis
+      score: parsed.score ?? 0,
+      matchedSkills: parsed.matchedSkills ?? [],
+      missingSkills: parsed.missingSkills ?? [],
+      suggestions: parsed.suggestions ?? [],
+      keywordScan
     });
 
   } catch (error) {

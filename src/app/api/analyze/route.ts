@@ -24,12 +24,12 @@ export async function POST(req: Request) {
 
     const data = await req.formData();
 
-    const file = data.get("resume") as File;
+    const file = data.get("resume") as File | null;
     const jobDescription = (data.get("jobDescription") as string) || "";
 
     if (!file) {
       return NextResponse.json(
-        { error: "No file uploaded" },
+        { error: "No resume uploaded" },
         { status: 400 }
       );
     }
@@ -44,10 +44,11 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
 
     tempPath = path.join(os.tmpdir(), `resume-${Date.now()}.pdf`);
-
     fs.writeFileSync(tempPath, buffer);
 
-    // Extract text from PDF
+    /* -----------------------------
+       Extract text from PDF
+    ----------------------------- */
 
     const rawText = await new Promise<string>((resolve, reject) => {
 
@@ -70,7 +71,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // Ask Groq AI
+    /* -----------------------------
+       Ask Groq AI
+    ----------------------------- */
 
     const completion = await groq.chat.completions.create({
 
@@ -78,20 +81,29 @@ export async function POST(req: Request) {
 
       messages: [
         {
+          role: "system",
+          content: "You are an ATS resume analyzer."
+        },
+        {
           role: "user",
           content: `
 You are an ATS system.
 
-Return ONLY valid JSON in this format:
+Extract relevant technical skills from the resume and compare them
+with the job description.
+
+Return ONLY JSON in this format:
 
 {
-  "score": number,
   "matchedSkills": ["skill"],
   "missingSkills": ["skill"],
   "suggestions": ["suggestion"]
 }
 
-Compare the resume with the job description.
+Important rules:
+- Only include REAL technical skills.
+- Ignore generic words like "developer".
+- Normalize skill names (JS -> JavaScript).
 
 Resume:
 ${text}
@@ -104,8 +116,16 @@ ${jobDescription}
 
     });
 
-    const rawAI =
+    /* -----------------------------
+       Clean AI output
+    ----------------------------- */
+
+    let rawAI =
       completion?.choices?.[0]?.message?.content || "{}";
+
+    // remove markdown code blocks if AI adds them
+
+    rawAI = rawAI.replace(/```json|```/g, "").trim();
 
     let parsed;
 
@@ -116,29 +136,56 @@ ${jobDescription}
         score: 0,
         matchedSkills: [],
         missingSkills: [],
-        suggestions: []
+        suggestions: ["AI response parsing failed"]
       };
     }
 
-    // Keyword scanning
+    /* -----------------------------
+       Safe score validation
+    ----------------------------- */
+
+    let score = Number(parsed.score) || 0;
+
+    if (score < 0) score = 0;
+    if (score > 100) score = 100;
+
+    /* -----------------------------
+       Keyword Scanner
+    ----------------------------- */
 
     const keywords =
-      jobDescription.toLowerCase().match(/\b[a-zA-Z+#.]+\b/g) || [];
+      jobDescription
+        .toLowerCase()
+        .match(/\b[a-zA-Z+#.]+\b/g) || [];
 
     const uniqueKeywords = [...new Set(keywords)];
 
-    const keywordScan = uniqueKeywords.slice(0, 40).map((keyword) => ({
-      keyword,
-      found: text.toLowerCase().includes(keyword)
-    }));
+    const keywordScan = uniqueKeywords
+      .slice(0, 40)
+      .map((keyword) => ({
+        keyword,
+        found: text.toLowerCase().includes(keyword)
+      }));
 
-    return NextResponse.json({
-      score: parsed.score ?? 0,
-      matchedSkills: parsed.matchedSkills ?? [],
-      missingSkills: parsed.missingSkills ?? [],
-      suggestions: parsed.suggestions ?? [],
-      keywordScan
-    });
+    /* -----------------------------
+       Response
+    ----------------------------- */
+
+    const matched = parsed.matchedSkills?.length || 0;
+const missing = parsed.missingSkills?.length || 0;
+
+const total = matched + missing;
+
+const calculatedScore =
+  total > 0 ? Math.round((matched / total) * 100) : 0;
+
+return NextResponse.json({
+  score: calculatedScore,
+  matchedSkills: parsed.matchedSkills ?? [],
+  missingSkills: parsed.missingSkills ?? [],
+  suggestions: parsed.suggestions ?? [],
+  keywordScan
+});
 
   } catch (error) {
 

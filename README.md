@@ -50,7 +50,7 @@ Download your ATS report instantly.
 
 ### 🏠 Upload Interface
 <p align="center">
-  <img src="./screenshots/ss1.png" width="800"/>
+  <img src="./screenshots/ss3.png" width="800"/>
 </p>
 
 ### 📊 ATS Dashboard
@@ -60,7 +60,7 @@ Download your ATS report instantly.
 
 ### 🧠 AI Resume Insights
 <p align="center">
-  <img src="./screenshots/ss3.png" width="800"/>
+  <img src="./screenshots/ss1.png" width="800"/>
 </p>
 
 ---

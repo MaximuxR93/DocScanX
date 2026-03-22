@@ -14,10 +14,27 @@ import {
 import ATSScore from "./ATSScore";
 import ScoreChart from "./ScoreChart";
 
+interface RoadmapItem {
+  step: string;
+  why: string;
+  priority: string;
+}
+
+interface ScoreBreakdown {
+  totalSkills: number;
+  matchedSkills: number;
+  missingSkills: number;
+  matchPercentage: number;
+  formula: string;
+}
+
 interface AIResponse {
   score: number;
+  reasoning: string;
+  scoreBreakdown: ScoreBreakdown;
   matchedSkills: string[];
   missingSkills: string[];
+  topFixes: string[];
   suggestions: string[];
   sectionScores: {
     skills: number;
@@ -25,11 +42,17 @@ interface AIResponse {
     experience: number;
     education: number;
   };
+  sectionFeedback: {
+    skills: string;
+    projects: string;
+    experience: string;
+    education: string;
+  };
   rewrittenBullets: {
     original: string;
     improved: string;
   }[];
-  roadmap: string[];
+  roadmap: RoadmapItem[];
 }
 
 export default function ResumeUpload() {
@@ -82,14 +105,14 @@ export default function ResumeUpload() {
           AI Resume Analyzer
         </h1>
         <p className="text-gray-400 mt-2">
-          Optimize your resume with real job data
+          Data-driven ATS analysis with explainable scoring
         </p>
       </div>
 
       {/* UPLOAD */}
       <div
         {...getRootProps({
-          className: `p-8 rounded-xl border-2 border-dashed cursor-pointer mb-6 transition ${
+          className: `p-8 rounded-xl border-2 border-dashed cursor-pointer mb-6 ${
             isDragActive
               ? "border-purple-500 bg-purple-500/10"
               : "border-gray-700 hover:border-purple-500"
@@ -99,10 +122,9 @@ export default function ResumeUpload() {
         <input {...getInputProps()} />
 
         <div className="text-center">
-
           {file ? (
             <>
-              <p className="font-medium">{file.name}</p>
+              <p>{file.name}</p>
               <p className="text-xs text-gray-400">
                 {(file.size / 1024).toFixed(1)} KB
               </p>
@@ -112,37 +134,32 @@ export default function ResumeUpload() {
                   e.stopPropagation();
                   setFile(null);
                 }}
-                className="text-red-400 text-sm mt-2 flex items-center justify-center gap-1"
+                className="text-red-400 text-sm mt-2"
               >
-                <Trash2 className="w-4 h-4" />
-                Remove
+                <Trash2 className="inline w-4 h-4" /> Remove
               </button>
             </>
           ) : (
             <>
               <Upload className="mx-auto mb-2 text-purple-400" />
-              <p>Upload Resume</p>
-              <p className="text-xs text-gray-400">
-                Drag & drop or click
-              </p>
+              Upload Resume
             </>
           )}
-
         </div>
       </div>
 
-      {/* JOB DESCRIPTION */}
+      {/* JOB DESC */}
       <textarea
         value={jobDescription}
         onChange={(e) => setJobDescription(e.target.value)}
         placeholder="Paste job description..."
-        className="w-full p-4 rounded-xl bg-muted border border-gray-700 mb-6 focus:border-purple-500 outline-none"
+        className="w-full p-4 rounded-xl bg-muted border border-gray-700 mb-6"
       />
 
       {/* BUTTON */}
       <button
         onClick={handleUpload}
-        className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl flex justify-center gap-2 hover:scale-[1.02] transition shadow-lg shadow-purple-500/20"
+        className="w-full py-4 bg-purple-600 rounded-xl flex justify-center gap-2"
       >
         {loading ? (
           <>
@@ -157,127 +174,89 @@ export default function ResumeUpload() {
         )}
       </button>
 
-      {error && (
-        <p className="text-red-400 mt-4 text-center">{error}</p>
-      )}
+      {error && <p className="text-red-400 mt-4">{error}</p>}
 
       {/* RESULTS */}
       {data && (
-
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-12 space-y-10"
+          className="mt-12 space-y-8"
         >
 
           {/* SCORE */}
           <div className="text-center">
             <ATSScore score={data.score} />
-            <p className="text-xs text-gray-400 mt-2">
-              Based on keyword relevance & job match analysis
+          </div>
+
+          {/* WHY SCORE */}
+          <div className="p-6 bg-black/40 rounded-xl border border-red-500/20">
+            <h3 className="text-red-400 mb-2">Why this score?</h3>
+            <p className="text-sm mb-2">{data.reasoning}</p>
+
+            <p className="text-xs text-gray-400">
+              Based on {data.scoreBreakdown.matchedSkills} matched vs{" "}
+              {data.scoreBreakdown.missingSkills} missing skills
             </p>
           </div>
 
+          {/* PROOF SECTION */}
+          <div className="p-6 bg-black/40 rounded-xl border border-blue-500/20">
+            <h3 className="text-blue-400 mb-3">Score Breakdown (Proof)</h3>
+
+            <p>Matched Skills: {data.scoreBreakdown.matchedSkills}</p>
+            <p>Missing Skills: {data.scoreBreakdown.missingSkills}</p>
+            <p>Total Compared: {data.scoreBreakdown.totalSkills}</p>
+
+            <div className="mt-3 bg-black/60 p-3 rounded border text-xs font-mono">
+              {data.scoreBreakdown.formula}
+            </div>
+
+            <p className="mt-2 text-green-400">
+              Final Score: {data.scoreBreakdown.matchPercentage}%
+            </p>
+          </div>
+
+          {/* TOP FIXES */}
+          <div className="p-6 bg-black/40 rounded-xl border border-yellow-500/20">
+            <h3 className="text-yellow-400 mb-3">Top Priority Fixes</h3>
+            {data.topFixes.map((fix, i) => (
+              <p key={i}>⚠ {fix}</p>
+            ))}
+          </div>
+
           {/* CHART */}
-          <div className="p-6 rounded-xl bg-black/40 border border-gray-800 shadow-lg shadow-purple-500/10">
-            <h3 className="mb-4 font-semibold">Score Breakdown</h3>
+          <div className="p-6 bg-black/40 rounded-xl border border-gray-800">
             <ScoreChart data={data.sectionScores} />
           </div>
 
-          {/* SECTION CARDS */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-
-            {Object.entries(data.sectionScores).map(([k, v]) => (
-
-              <motion.div
-                key={k}
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="p-4 bg-black/40 rounded-xl border border-gray-800 hover:border-purple-500 transition shadow-md hover:shadow-purple-500/20"
-              >
-
-                <p className="text-sm text-gray-400 capitalize">
-                  {k} Match
-                </p>
-
-                <div className="h-2 bg-gray-700 rounded-full mt-2">
-                  <div
-                    className="h-2 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
-                    style={{ width: `${v}%` }}
-                  />
-                </div>
-
-                <p className="mt-2 text-sm font-semibold">{v}%</p>
-
-              </motion.div>
-
+          {/* SECTION FEEDBACK */}
+          <div className="grid md:grid-cols-2 gap-4">
+            {Object.entries(data.sectionFeedback).map(([k, v]) => (
+              <div key={k} className="p-4 bg-black/40 rounded-xl border border-gray-800">
+                <p className="text-gray-400 capitalize">{k}</p>
+                <p className="text-sm mt-2">{v}</p>
+              </div>
             ))}
-
           </div>
-
-          {/* SKILLS */}
-          <div className="grid md:grid-cols-2 gap-6">
-
-            <div className="p-6 bg-black/40 rounded-xl border border-gray-800 shadow-md">
-              <h3 className="mb-3 font-semibold">Matched Skills</h3>
-              <div className="flex flex-wrap gap-2">
-                {data.matchedSkills.map(s => (
-                  <span key={s} className="px-3 py-1 bg-green-500/20 border border-green-400 rounded-full text-sm">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-6 bg-black/40 rounded-xl border border-gray-800 shadow-md">
-              <h3 className="mb-3 font-semibold">Missing Skills</h3>
-              <div className="flex flex-wrap gap-2">
-                {data.missingSkills.map(s => (
-                  <span key={s} className="px-3 py-1 bg-red-500/20 border border-red-400 rounded-full text-sm">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-          </div>
-
-          {/* BULLETS */}
-          {data.rewrittenBullets.length > 0 && (
-            <div className="p-6 bg-black/40 rounded-xl border border-gray-800 shadow-md">
-              <h3 className="mb-4 font-semibold">Resume Improvements</h3>
-
-              {data.rewrittenBullets.map((b, i) => (
-                <div key={i} className="mb-4">
-                  <p className="text-red-400 line-through text-sm">{b.original}</p>
-                  <p className="text-green-400 text-sm">{b.improved}</p>
-                </div>
-              ))}
-
-            </div>
-          )}
 
           {/* ROADMAP */}
-          {data.roadmap.length > 0 && (
-            <div className="p-6 bg-black/40 rounded-xl border border-gray-800 shadow-md">
-              <h3 className="mb-4 font-semibold">Career Roadmap</h3>
-
-              <ul className="space-y-2 text-sm">
-                {data.roadmap.map((r, i) => (
-                  <li key={i}>👉 {r}</li>
-                ))}
-              </ul>
-
-            </div>
-          )}
+          <div className="p-6 bg-black/40 rounded-xl border border-gray-800">
+            <h3>Career Roadmap</h3>
+            {data.roadmap.map((r, i) => (
+              <div key={i} className="mt-3">
+                <p>{r.step} ({r.priority})</p>
+                <p className="text-sm text-gray-400">{r.why}</p>
+              </div>
+            ))}
+          </div>
 
           {/* DOWNLOAD */}
           <button
             onClick={() => window.print()}
-            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex justify-center gap-2 hover:scale-[1.02] transition shadow-lg shadow-indigo-500/20"
+            className="w-full py-3 bg-indigo-600 rounded-lg flex justify-center gap-2"
           >
-            <Download />
-            Download Report
+            <Download /> Download Report
           </button>
 
         </motion.div>

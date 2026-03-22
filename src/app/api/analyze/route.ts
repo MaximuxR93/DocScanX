@@ -60,39 +60,18 @@ export async function POST(req: Request) {
         {
           role: "system",
           content: `
-You are an advanced ATS (Applicant Tracking System).
+You are a STRICT ATS + Senior Technical Recruiter.
 
-Analyze resumes like real hiring software.
-
-Your job:
-- Compare resume vs job description
-- Score realistically (NOT random)
-- Think like a recruiter
-
-Scoring rules:
-- 90+ = strong match
-- 70–89 = good
-- 50–69 = average
-- below 50 = weak
-
-Also evaluate sections separately:
-- skills
-- projects
-- experience
-- education
+Be brutally honest. No fluff.
 
 Return ONLY JSON:
-`
-        },
-        {
-          role: "user",
-          content: `
-Return JSON:
 
 {
   "score": number,
+  "reasoning": "why this score",
   "matchedSkills": ["skill"],
   "missingSkills": ["skill"],
+  "topFixes": ["fix1", "fix2", "fix3"],
   "suggestions": ["suggestion"],
   "sectionScores": {
     "skills": number,
@@ -100,20 +79,34 @@ Return JSON:
     "experience": number,
     "education": number
   },
+  "sectionFeedback": {
+    "skills": "why",
+    "projects": "why",
+    "experience": "why",
+    "education": "why"
+  },
   "rewrittenBullets": [
     {
       "original": "text",
       "improved": "text"
     }
   ],
-  "roadmap": ["step"]
+  "roadmap": [
+    {
+      "step": "step name",
+      "why": "reason",
+      "priority": "high/medium/low"
+    }
+  ]
 }
+`
+        },
+        {
+          role: "user",
+          content: `
+Analyze this resume vs job description.
 
-Rules:
-- Use realistic percentages (0–100)
-- Avoid giving 0 unless truly missing
-- Keep values believable
-- Extract real skills (React, Node, MongoDB etc.)
+Be strict. Be realistic.
 
 Resume:
 ${text}
@@ -142,29 +135,49 @@ ${jobDescription}
 
     /* ---------- SAFE FALLBACKS ---------- */
 
-    const score = Math.min(100, Math.max(0, parsed.score || 50));
-
-    const sectionScores = parsed.sectionScores || {
-      skills: Math.round(score * 0.9),
-      projects: Math.round(score * 0.8),
-      experience: Math.round(score * 0.75),
-      education: Math.round(score * 0.7),
-    };
+    const score = Math.min(100, Math.max(0, parsed.score ?? 50));
 
     const matchedSkills =
       parsed.matchedSkills?.length > 0
         ? parsed.matchedSkills
-        : ["JavaScript", "React", "Node.js"];
+        : ["JavaScript", "React"];
 
     const missingSkills =
       parsed.missingSkills?.length > 0
         ? parsed.missingSkills
-        : ["TypeScript", "Testing", "System Design"];
+        : ["TypeScript", "System Design"];
+
+    const reasoning =
+      parsed.reasoning ||
+      "Resume lacks strong alignment with required skills.";
+
+    const topFixes =
+      parsed.topFixes?.length > 0
+        ? parsed.topFixes
+        : [
+            "Add measurable project impact",
+            "Include missing core technologies",
+            "Improve clarity of experience"
+          ];
 
     const suggestions =
       parsed.suggestions?.length > 0
         ? parsed.suggestions
-        : ["Improve project descriptions", "Add measurable impact"];
+        : ["Use metrics (%, numbers)", "Add production-level work"];
+
+    const sectionScores = parsed.sectionScores || {
+      skills: Math.round(score * 0.9),
+      projects: Math.round(score * 0.8),
+      experience: Math.round(score * 0.7),
+      education: Math.round(score * 0.6),
+    };
+
+    const sectionFeedback = parsed.sectionFeedback || {
+      skills: "Skills coverage is incomplete.",
+      projects: "Projects lack depth and impact.",
+      experience: "Experience is weak or missing.",
+      education: "Education is average."
+    };
 
     const rewrittenBullets = parsed.rewrittenBullets ?? [];
 
@@ -172,19 +185,42 @@ ${jobDescription}
       parsed.roadmap?.length > 0
         ? parsed.roadmap
         : [
-            "Learn advanced JavaScript",
-            "Build full-stack projects",
-            "Learn system design",
+            {
+              step: "Learn core technologies",
+              why: "Missing required stack",
+              priority: "high"
+            }
           ];
+
+    /* ---------- PROOF-BASED SCORING ---------- */
+
+    const totalSkills = matchedSkills.length + missingSkills.length;
+
+    const matchPercentage =
+      totalSkills > 0
+        ? Math.round((matchedSkills.length / totalSkills) * 100)
+        : score;
+
+    const scoreBreakdown = {
+      totalSkills,
+      matchedSkills: matchedSkills.length,
+      missingSkills: missingSkills.length,
+      matchPercentage,
+      formula: "matched_skills / total_skills * 100"
+    };
 
     /* ---------- FINAL RESPONSE ---------- */
 
     return NextResponse.json({
-      score,
+      score: matchPercentage, // 🔥 now data-driven
+      reasoning,
+      scoreBreakdown,
       matchedSkills,
       missingSkills,
+      topFixes,
       suggestions,
       sectionScores,
+      sectionFeedback,
       rewrittenBullets,
       roadmap
     });

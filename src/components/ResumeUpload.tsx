@@ -65,14 +65,10 @@ export default function ResumeUpload() {
   const [error, setError] = useState<string | null>(null);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-  onDrop: (files) => {
-    if (files && files.length > 0) {
-      setFile(files[0]);
-    }
-  },
-  accept: { "application/pdf": [".pdf"] },
-  maxFiles: 1
-});
+    onDrop: (files) => setFile(files[0]),
+    accept: { "application/pdf": [".pdf"] },
+    maxFiles: 1
+  });
 
   const handleUpload = async () => {
     if (!file) return alert("Upload resume");

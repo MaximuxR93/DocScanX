@@ -64,14 +64,16 @@ export default function ResumeUpload() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ FIXED dropzone
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-  onDrop: (acceptedFiles: File[]) => {
-    setFile(acceptedFiles?.[0] ?? null);
-  },
-  accept: { "application/pdf": [".pdf"] },
-  maxFiles: 1
-});
+    onDrop: (acceptedFiles: File[]) => {
+      setFile(acceptedFiles?.[0] ?? null);
+    },
+    accept: { "application/pdf": [".pdf"] },
+    maxFiles: 1
+  });
 
+  // ✅ FIXED upload handler (debug enabled)
   const handleUpload = async () => {
     if (!file) return alert("Upload resume");
 
@@ -88,11 +90,21 @@ export default function ResumeUpload() {
         body: formData
       });
 
+      // 🔥 SHOW REAL ERROR FROM BACKEND
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("API ERROR:", text);
+        setError(text || "API failed");
+        setLoading(false);
+        return;
+      }
+
       const result = await res.json();
       setData(result);
 
-    } catch {
-      setError("Failed to analyze");
+    } catch (err: any) {
+      console.error("FETCH ERROR:", err);
+      setError(err?.message || "Failed to analyze");
     }
 
     setLoading(false);
@@ -186,12 +198,10 @@ export default function ResumeUpload() {
           className="mt-12 space-y-8"
         >
 
-          {/* SCORE */}
           <div className="text-center">
             <ATSScore score={data.score} />
           </div>
 
-          {/* WHY SCORE */}
           <div className="p-6 bg-black/40 rounded-xl border border-red-500/20">
             <h3 className="text-red-400 mb-2">Why this score?</h3>
             <p className="text-sm mb-2">{data.reasoning}</p>
@@ -202,7 +212,6 @@ export default function ResumeUpload() {
             </p>
           </div>
 
-          {/* PROOF SECTION */}
           <div className="p-6 bg-black/40 rounded-xl border border-blue-500/20">
             <h3 className="text-blue-400 mb-3">Score Breakdown (Proof)</h3>
 
@@ -219,7 +228,6 @@ export default function ResumeUpload() {
             </p>
           </div>
 
-          {/* TOP FIXES */}
           <div className="p-6 bg-black/40 rounded-xl border border-yellow-500/20">
             <h3 className="text-yellow-400 mb-3">Top Priority Fixes</h3>
             {data.topFixes.map((fix, i) => (
@@ -227,12 +235,10 @@ export default function ResumeUpload() {
             ))}
           </div>
 
-          {/* CHART */}
           <div className="p-6 bg-black/40 rounded-xl border border-gray-800">
             <ScoreChart data={data.sectionScores} />
           </div>
 
-          {/* SECTION FEEDBACK */}
           <div className="grid md:grid-cols-2 gap-4">
             {Object.entries(data.sectionFeedback).map(([k, v]) => (
               <div key={k} className="p-4 bg-black/40 rounded-xl border border-gray-800">
@@ -242,7 +248,6 @@ export default function ResumeUpload() {
             ))}
           </div>
 
-          {/* ROADMAP */}
           <div className="p-6 bg-black/40 rounded-xl border border-gray-800">
             <h3>Career Roadmap</h3>
             {data.roadmap.map((r, i) => (
@@ -253,7 +258,6 @@ export default function ResumeUpload() {
             ))}
           </div>
 
-          {/* DOWNLOAD */}
           <button
             onClick={() => window.print()}
             className="w-full py-3 bg-indigo-600 rounded-lg flex justify-center gap-2"

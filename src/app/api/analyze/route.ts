@@ -1,3 +1,4 @@
+
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
@@ -36,12 +37,17 @@ export async function POST(req: Request) {
 
     /* ---------- EXTRACT TEXT ---------- */
 
-    const rawText = await new Promise<string>((resolve, reject) => {
-      extract(tempPath, (err: Error, pages: string[]) => {
-        if (err) return reject(err);
-        resolve(pages.join(" "));
-      });
+    const rawText = await Promise.race([
+  new Promise<string>((resolve, reject) => {
+    extract(tempPath, (err: Error, pages: string[]) => {
+      if (err) return reject(err);
+      resolve(pages.join(" "));
     });
+  }),
+  new Promise<string>((_, reject) =>
+    setTimeout(() => reject(new Error("PDF extraction timeout")), 10000)
+  )
+]);
 
     const text = rawText.replace(/\s+/g, " ").trim();
 

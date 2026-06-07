@@ -1,4 +1,3 @@
-
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
@@ -13,16 +12,23 @@ const os = require("os");
 
 import Groq from "groq-sdk";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY!,
-});
+function getGroqClient(): Groq {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GROQ_API_KEY is not set. Add it to your .env.local file:\nGROQ_API_KEY=gsk_your_key_here"
+    );
+  }
+  return new Groq({ apiKey });
+}
 
 export async function POST(req: Request) {
   let tempPath: string | null = null;
 
   try {
-    const data = await req.formData();
+    const groq = getGroqClient();
 
+    const data = await req.formData();
     const file = data.get("resume") as File;
     const jobDescription = (data.get("jobDescription") as string) || "";
 
@@ -31,29 +37,28 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-
     tempPath = path.join(os.tmpdir(), `resume-${Date.now()}.pdf`);
     fs.writeFileSync(tempPath, buffer);
 
     /* ---------- EXTRACT TEXT ---------- */
 
     const rawText = await Promise.race([
-  new Promise<string>((resolve, reject) => {
-    extract(tempPath, (err: Error, pages: string[]) => {
-      if (err) return reject(err);
-      resolve(pages.join(" "));
-    });
-  }),
-  new Promise<string>((_, reject) =>
-    setTimeout(() => reject(new Error("PDF extraction timeout")), 10000)
-  )
-]);
+      new Promise<string>((resolve, reject) => {
+        extract(tempPath, (err: Error, pages: string[]) => {
+          if (err) return reject(err);
+          resolve(pages.join(" "));
+        });
+      }),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error("PDF extraction timeout")), 10000)
+      ),
+    ]);
 
     const text = rawText.replace(/\s+/g, " ").trim();
 
     if (!text) {
       return NextResponse.json(
-        { error: "Could not extract text" },
+        { error: "Could not extract text from PDF" },
         { status: 422 }
       );
     }
@@ -70,7 +75,7 @@ You are a STRICT ATS + Senior Technical Recruiter.
 
 Be brutally honest. No fluff.
 
-Return ONLY JSON:
+Return ONLY valid JSON — no markdown, no backticks, no preamble:
 
 {
   "score": number,
@@ -105,7 +110,7 @@ Return ONLY JSON:
     }
   ]
 }
-`
+`,
         },
         {
           role: "user",
@@ -119,20 +124,17 @@ ${text}
 
 Job Description:
 ${jobDescription}
-`
-        }
-      ]
+`,
+        },
+      ],
     });
 
     /* ---------- CLEAN RESPONSE ---------- */
 
-    let rawAI =
-      completion?.choices?.[0]?.message?.content || "{}";
-
+    let rawAI = completion?.choices?.[0]?.message?.content || "{}";
     rawAI = rawAI.replace(/```json|```/g, "").trim();
 
     let parsed: any = {};
-
     try {
       parsed = JSON.parse(rawAI);
     } catch {
@@ -154,8 +156,7 @@ ${jobDescription}
         : ["TypeScript", "System Design"];
 
     const reasoning =
-      parsed.reasoning ||
-      "Resume lacks strong alignment with required skills.";
+      parsed.reasoning || "Resume lacks strong alignment with required skills.";
 
     const topFixes =
       parsed.topFixes?.length > 0
@@ -163,7 +164,7 @@ ${jobDescription}
         : [
             "Add measurable project impact",
             "Include missing core technologies",
-            "Improve clarity of experience"
+            "Improve clarity of experience",
           ];
 
     const suggestions =
@@ -182,7 +183,7 @@ ${jobDescription}
       skills: "Skills coverage is incomplete.",
       projects: "Projects lack depth and impact.",
       experience: "Experience is weak or missing.",
-      education: "Education is average."
+      education: "Education is average.",
     };
 
     const rewrittenBullets = parsed.rewrittenBullets ?? [];
@@ -194,14 +195,13 @@ ${jobDescription}
             {
               step: "Learn core technologies",
               why: "Missing required stack",
-              priority: "high"
-            }
+              priority: "high",
+            },
           ];
 
     /* ---------- PROOF-BASED SCORING ---------- */
 
     const totalSkills = matchedSkills.length + missingSkills.length;
-
     const matchPercentage =
       totalSkills > 0
         ? Math.round((matchedSkills.length / totalSkills) * 100)
@@ -212,13 +212,13 @@ ${jobDescription}
       matchedSkills: matchedSkills.length,
       missingSkills: missingSkills.length,
       matchPercentage,
-      formula: "matched_skills / total_skills * 100"
+      formula: "matched_skills / total_skills * 100",
     };
 
     /* ---------- FINAL RESPONSE ---------- */
 
     return NextResponse.json({
-      score: matchPercentage, // 🔥 now data-driven
+      score: matchPercentage,
       reasoning,
       scoreBreakdown,
       matchedSkills,
@@ -228,17 +228,25 @@ ${jobDescription}
       sectionScores,
       sectionFeedback,
       rewrittenBullets,
-      roadmap
+      roadmap,
     });
+  } catch (error: any) {
+    console.error("[/api/analyze]", error?.message ?? error);
 
-  } catch (error) {
-    console.error(error);
+    const isEnvError = error?.message?.includes("GROQ_API_KEY");
+    const isAuthError = error?.status === 401;
 
-    return NextResponse.json(
-      { error: "Analysis failed" },
-      { status: 500 }
-    );
+    if (isEnvError || isAuthError) {
+      return NextResponse.json(
+        {
+          error: "Invalid or missing Groq API key.",
+          hint: "Set GROQ_API_KEY in your .env.local file and restart the dev server.",
+        },
+        { status: 401 }
+      );
+    }
 
+    return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
   } finally {
     if (tempPath && fs.existsSync(tempPath)) {
       fs.unlinkSync(tempPath);

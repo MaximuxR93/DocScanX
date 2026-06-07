@@ -6,6 +6,12 @@
 </p>
 
 <p align="center">
+  <a href="https://doc-scan-x-maximuxr93s-projects.vercel.app/" target="_blank">
+    <img src="https://img.shields.io/badge/🚀%20Live%20Demo-Visit%20DocScanX-brightgreen?style=for-the-badge" alt="Live Demo"/>
+  </a>
+</p>
+
+<p align="center">
   <img src="./screenshots/ss3.png" width="800"/>
 </p>
 
@@ -93,3 +99,30 @@ Download your ATS report instantly.
 git clone https://github.com/MaximuxR93/DocScanX.git
 cd DocScanX
 npm install
+```
+
+Create a `.env.local` file:
+
+```env
+GROQ_API_KEY=your_groq_api_key_here
+```
+
+Run the dev server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## 🌐 Live Demo
+
+👉 **[doc-scan-x-maximuxr93s-projects.vercel.app](https://doc-scan-x-maximuxr93s-projects.vercel.app/)**
+
+---
+
+## 📄 License
+
+MIT © [MaximuxR93](https://github.com/MaximuxR93)

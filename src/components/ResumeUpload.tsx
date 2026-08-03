@@ -35,7 +35,7 @@ const TABS = [
 
 type Tab = typeof TABS[number]["id"];
 
-const priorityConfig: Record<string, { color: string; bg: string; label: string }> = {
+const priorityConfig: Record<string, { color: string; bg: string; label: string } | undefined> = {
   high:   { color: "#ef4444", bg: "#ef444415", label: "High" },
   medium: { color: "#f59e0b", bg: "#f59e0b15", label: "Medium" },
   low:    { color: "#22c55e", bg: "#22c55e15", label: "Low" },
@@ -361,7 +361,7 @@ export default function ResumeUpload() {
                       <div className="absolute left-[18px] top-0 bottom-0 w-px bg-zinc-800" />
                       <div className="space-y-6">
                         {data.roadmap.map((r, i) => {
-                          const p = priorityConfig[r.priority?.toLowerCase()] ?? priorityConfig.medium;
+                          const p = priorityConfig[r.priority?.toLowerCase()] ?? { color: "#f59e0b", bg: "#f59e0b15", label: "Medium" };
                           return (
                             <div key={i} className="flex gap-4 relative">
                               <div
